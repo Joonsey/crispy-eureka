@@ -68,7 +68,7 @@ pub fn main() !void {
         const rotation = DirectionDegrees(cube_position, rel_mouse_position);
 
         rl.BeginTextureMode(screen);
-        rl.ClearBackground(rl.RAYWHITE);
+        rl.ClearBackground(rl.BLACK);
         rl.DrawCircle(cube_position.x, cube_position.y, 10, rl.RED);
         rl.DrawCircle(@intFromFloat(rel_mouse_position.x), @intFromFloat(rel_mouse_position.y), 10, rl.YELLOW);
         drawSpriteStack(cube, cube_position, rotation * 180 / rl.PI);
