@@ -3,14 +3,15 @@ const rl = @cImport({
     @cInclude("raylib.h");
     @cInclude("raymath.h");
 });
+const particles = @import("particle.zig");
 
 // screen resolution
 const SCREEN_HEIGHT = 720.0;
 const SCREEN_WIDTH = 1080.0;
 
 // the 'screen' we render to
-const RENDER_HEIGHT = 360.0;
-const RENDER_WIDTH = 540.0;
+const RENDER_HEIGHT = 270.0;
+const RENDER_WIDTH = 480.0;
 
 /// Draws perfectly on top of the center position
 ///Center position will be center bottom point of the 'rectangle' that is the texture
@@ -56,23 +57,61 @@ pub fn GetRelativeMousePosition() rl.Vector2 {
     );
 }
 
+const Boss = struct {
+    sprite: rl.Texture,
+    pos: rl.Vector2,
+    rotation: f32 = 0,
+
+    pub fn update(self: *@This(), target_pos: rl.Vector2) void {
+        self.rotation = DirectionDegrees(self.pos, target_pos);
+    }
+
+    pub fn draw(self: @This()) void {
+        drawSpriteStack(self.sprite, self.pos, self.rotation * 180 / rl.PI);
+    }
+
+    fn attack(self: *@This(), target_pos: rl.Vector2) void {
+        rl.DrawLineEx(self.pos, target_pos, 8, rl.RED);
+        rl.DrawLineEx(self.pos, target_pos, 4, rl.WHITE);
+    }
+};
+
 pub fn main() !void {
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "bossrush");
     rl.SetTargetFPS(60);
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
+    const allocator = gpa.allocator();
+
+    var particle_system = try particles.ParticleSystem.init(allocator);
     const cube = rl.LoadTexture("assets/cube.png");
     const screen = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
     const cube_position: rl.Vector2 = .{ .x = 200, .y = 200 };
 
+    var boss: Boss = .{ .sprite = cube, .pos = cube_position, .rotation = 0 };
+
+    var spark = particles.Spark.init(cube_position, 0, rl.BLUE, 2.0, 1.00, 2);
+
+    particle_system.register(.{ .Spark = spark });
+
     while (!rl.WindowShouldClose()) {
         const rel_mouse_position = GetRelativeMousePosition();
-        const rotation = DirectionDegrees(cube_position, rel_mouse_position);
+        const dt = rl.GetFrameTime();
 
         rl.BeginTextureMode(screen);
         rl.ClearBackground(rl.BLACK);
         rl.DrawCircle(cube_position.x, cube_position.y, 10, rl.RED);
-        rl.DrawCircle(@intFromFloat(rel_mouse_position.x), @intFromFloat(rel_mouse_position.y), 10, rl.YELLOW);
-        drawSpriteStack(cube, cube_position, rotation * 180 / rl.PI);
+        boss.update(rel_mouse_position);
+        boss.draw();
 
+        if (rl.IsMouseButtonDown(rl.MOUSE_BUTTON_LEFT)) {
+            boss.attack(rel_mouse_position);
+            spark = particles.Spark.init(rel_mouse_position, boss.rotation, rl.WHITE, 2.0, 1.00, 2);
+            particle_system.register(.{ .Spark = spark });
+        }
+
+        particle_system.update(dt);
+        particle_system.draw();
         rl.EndTextureMode();
 
         rl.BeginDrawing();
@@ -86,6 +125,7 @@ pub fn main() !void {
             0,
             rl.WHITE,
         );
+
         rl.EndDrawing();
     }
 }
