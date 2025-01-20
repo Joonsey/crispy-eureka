@@ -3,129 +3,74 @@ const rl = @cImport({
     @cInclude("raylib.h");
     @cInclude("raymath.h");
 });
-const particles = @import("particle.zig");
 
-// screen resolution
+const particles = @import("particle.zig"); // assuming this is where particles will come from
+const util = @import("util.zig");
+const entities = @import("ecs.zig");
+
 const SCREEN_HEIGHT = 720.0;
 const SCREEN_WIDTH = 1080.0;
 
-// the 'screen' we render to
-const RENDER_HEIGHT = 270.0;
-const RENDER_WIDTH = 480.0;
-
-/// Draws perfectly on top of the center position
-///Center position will be center bottom point of the 'rectangle' that is the texture
-pub fn drawSpriteStack(image: rl.Texture, center_position: rl.Vector2, rotation: f32) void {
-    const amount: usize = @intCast(@divTrunc(image.height, image.width));
-    for (0..amount + 1) |i| {
-        const inverse_i = amount - i;
-        const src_y: f32 = @as(f32, @floatFromInt(inverse_i)) * @as(f32, @floatFromInt(image.width));
-        const dest_y: f32 = @as(f32, @floatFromInt(inverse_i)) - @as(f32, @floatFromInt(amount));
-        rl.DrawTexturePro(
-            image,
-            .{
-                .x = 0,
-                .y = src_y,
-                .width = @floatFromInt(image.width),
-                .height = @floatFromInt(image.width),
-            },
-            .{
-                .x = center_position.x,
-                .y = dest_y + center_position.y,
-                .width = @floatFromInt(image.width),
-                .height = @floatFromInt(image.width),
-            },
-            .{ .x = @as(f32, @floatFromInt(image.width)) / 2, .y = @as(f32, @floatFromInt(image.width)) / 2 },
-            rotation,
-            rl.WHITE,
-        );
-    }
-}
-
-pub fn DirectionDegrees(A: rl.Vector2, B: rl.Vector2) f32 {
-    const deltaX = B.x - A.x;
-    const deltaY = B.y - A.y;
-    const radians: f32 = @floatCast(rl.atan2(deltaY, deltaX));
-    return radians;
-}
-
-pub fn GetRelativeMousePosition() rl.Vector2 {
-    const mouse_position = rl.GetMousePosition();
-    return rl.Vector2Multiply(
-        mouse_position,
-        .{ .x = RENDER_WIDTH / SCREEN_WIDTH, .y = RENDER_HEIGHT / SCREEN_HEIGHT },
-    );
-}
-
-const Boss = struct {
-    sprite: rl.Texture,
-    pos: rl.Vector2,
-    rotation: f32 = 0,
-
-    pub fn update(self: *@This(), target_pos: rl.Vector2) void {
-        self.rotation = DirectionDegrees(self.pos, target_pos);
-    }
-
-    pub fn draw(self: @This()) void {
-        drawSpriteStack(self.sprite, self.pos, self.rotation * 180 / rl.PI);
-    }
-
-    fn attack(self: *@This(), target_pos: rl.Vector2) void {
-        rl.DrawLineEx(self.pos, target_pos, 8, rl.RED);
-        rl.DrawLineEx(self.pos, target_pos, 4, rl.WHITE);
-    }
-};
+const RENDER_HEIGHT = 240.0;
+const RENDER_WIDTH = 360.0;
 
 pub fn main() !void {
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "bossrush");
+    defer rl.CloseWindow();
     rl.SetTargetFPS(60);
+    const render_texture = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
+    const occlusion_mask = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
+    const scene = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
+    const lighting = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
+    const lightingShader = rl.LoadShader(null, "./lighting.glsl");
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}).init;
-    const allocator = gpa.allocator();
+    const rayCountLoc = rl.GetShaderLocation(lightingShader, "rayCount");
+    const sizeloc = rl.GetShaderLocation(lightingShader, "size");
 
-    var particle_system = try particles.ParticleSystem.init(allocator);
-    const cube = rl.LoadTexture("assets/cube.png");
-    const screen = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
-    const cube_position: rl.Vector2 = .{ .x = 200, .y = 200 };
+    const size: rl.Vector2 = .{ .x = RENDER_WIDTH, .y = RENDER_HEIGHT };
+    rl.SetShaderValue(lightingShader, sizeloc, &size, rl.SHADER_UNIFORM_VEC2);
 
-    var boss: Boss = .{ .sprite = cube, .pos = cube_position, .rotation = 0 };
-
-    var spark = particles.Spark.init(cube_position, 0, rl.BLUE, 2.0, 1.00, 2);
-
-    particle_system.register(.{ .Spark = spark });
-
+    const rayCount: i32 = 32;
+    rl.SetShaderValue(lightingShader, rayCountLoc, &rayCount, rl.SHADER_UNIFORM_INT);
     while (!rl.WindowShouldClose()) {
-        const rel_mouse_position = GetRelativeMousePosition();
-        const dt = rl.GetFrameTime();
+        rl.BeginTextureMode(occlusion_mask);
+        rl.ClearBackground(rl.BLANK);
+        rl.DrawRectangle(25, 30, 10, 100, rl.BLACK);
+        rl.DrawRectangle(45, 30, 10, 100, rl.BLACK);
+        rl.EndTextureMode();
 
-        rl.BeginTextureMode(screen);
-        rl.ClearBackground(rl.BLACK);
-        rl.DrawCircle(cube_position.x, cube_position.y, 10, rl.RED);
-        boss.update(rel_mouse_position);
-        boss.draw();
+        const mouse_position = util.GetRelativeMousePosition(RENDER_WIDTH, SCREEN_WIDTH, RENDER_HEIGHT, SCREEN_HEIGHT);
+        rl.BeginTextureMode(lighting);
+        rl.ClearBackground(rl.BLANK);
+        rl.DrawRectangle(100, 100, 20, 35, rl.RED);
+        rl.DrawCircle(150, 200, 16, rl.BLUE);
+        rl.DrawCircleV(mouse_position, 16, rl.GREEN);
+        rl.EndTextureMode();
 
-        if (rl.IsMouseButtonDown(rl.MOUSE_BUTTON_LEFT)) {
-            boss.attack(rel_mouse_position);
-            spark = particles.Spark.init(rel_mouse_position, boss.rotation, rl.WHITE, 2.0, 1.00, 2);
-            particle_system.register(.{ .Spark = spark });
-        }
+        rl.BeginTextureMode(scene);
+        rl.DrawRectangle(140, 25, 20, 110, rl.WHITE);
+        rl.EndTextureMode();
 
-        particle_system.update(dt);
-        particle_system.draw();
+        rl.BeginTextureMode(render_texture);
+        rl.BeginShaderMode(lightingShader);
+        rl.SetShaderValueTexture(lightingShader, rl.GetShaderLocation(lightingShader, "lighting"), lighting.texture);
+        rl.SetShaderValueTexture(lightingShader, rl.GetShaderLocation(lightingShader, "occlusion"), occlusion_mask.texture);
+        rl.DrawTexture(scene.texture, 0, 0, rl.WHITE);
+        rl.EndShaderMode();
         rl.EndTextureMode();
 
         rl.BeginDrawing();
-        rl.ClearBackground(rl.BLACK);
-        rl.DrawTexture(screen.texture, 0, 0, rl.WHITE);
-        rl.DrawTexturePro(
-            screen.texture,
-            .{ .x = 0, .y = 0, .width = @floatFromInt(screen.texture.width), .height = @floatFromInt(-screen.texture.height) },
-            .{ .x = 0, .y = 0, .width = SCREEN_WIDTH, .height = SCREEN_HEIGHT },
-            rl.Vector2Zero(),
-            0,
-            rl.WHITE,
-        );
-
+        rl.DrawTexturePro(render_texture.texture, .{
+            .x = 0,
+            .y = 0,
+            .width = RENDER_WIDTH,
+            .height = RENDER_HEIGHT,
+        }, .{
+            .x = 0,
+            .y = 0,
+            .width = SCREEN_WIDTH,
+            .height = SCREEN_HEIGHT,
+        }, rl.Vector2Zero(), 0, rl.WHITE);
         rl.EndDrawing();
     }
 }
