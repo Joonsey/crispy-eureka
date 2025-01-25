@@ -8,7 +8,6 @@ const particles = @import("particle.zig"); // assuming this is where particles w
 const util = @import("util.zig");
 const entities = @import("ecs.zig");
 const render = @import("render/main.zig");
-const Animator = render.Animator;
 const System = render.System;
 
 const SCREEN_HEIGHT = 720.0;
