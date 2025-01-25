@@ -7,15 +7,18 @@ const rl = @cImport({
 const particles = @import("particle.zig"); // assuming this is where particles will come from
 const util = @import("util.zig");
 const entities = @import("ecs.zig");
-const tatl = @import("tatl.zig");
-const Animator = @import("animator.zig").Animator;
-const Sprite = @import("sprites.zig").Sprite;
+const render = @import("render/main.zig");
+const Animator = render.Animator;
+const System = render.System;
 
 const SCREEN_HEIGHT = 720.0;
 const SCREEN_WIDTH = 1080.0;
 
 const RENDER_HEIGHT = 240.0;
 const RENDER_WIDTH = 360.0;
+
+var GPA = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = GPA.allocator();
 
 pub fn main() !void {
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "bossrush");
@@ -33,9 +36,8 @@ pub fn main() !void {
     const size: rl.Vector2 = .{ .x = RENDER_WIDTH, .y = RENDER_HEIGHT };
     rl.SetShaderValue(lightingShader, sizeloc, &size, rl.SHADER_UNIFORM_VEC2);
 
-    const anim = try Animator.load("idle.aseprite");
-
-    var sprite: Sprite = .{ .animator = anim, .direction = .left, .position = rl.Vector2Zero() };
+    var system = System.init();
+    system.register_entity(1, 0);
 
     var left = true;
 
@@ -50,12 +52,12 @@ pub fn main() !void {
         rl.EndTextureMode();
 
         const mouse_position = util.GetRelativeMousePosition(RENDER_WIDTH, SCREEN_WIDTH, RENDER_HEIGHT, SCREEN_HEIGHT);
-        sprite.position = mouse_position;
+        _ = mouse_position; // autofix
         rl.BeginTextureMode(lighting);
         rl.ClearBackground(rl.BLANK);
         rl.DrawRectangle(100, 100, 20, 35, rl.RED);
         rl.DrawCircle(150, 200, 16, rl.BLUE);
-        try sprite.draw();
+        system.tick(frametime_ms);
         rl.EndTextureMode();
 
         if (rl.IsKeyPressed(rl.KEY_R)) left = !left;
@@ -63,8 +65,6 @@ pub fn main() !void {
         rl.BeginTextureMode(scene);
         rl.DrawRectangle(140, 25, 20, 110, rl.WHITE);
         rl.EndTextureMode();
-
-        try sprite.animator.update(frametime_ms);
 
         rl.BeginTextureMode(render_texture);
         rl.BeginShaderMode(lightingShader);
