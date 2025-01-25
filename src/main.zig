@@ -7,6 +7,9 @@ const rl = @cImport({
 const particles = @import("particle.zig"); // assuming this is where particles will come from
 const util = @import("util.zig");
 const entities = @import("ecs.zig");
+const tatl = @import("tatl.zig");
+const Animator = @import("animator.zig").Animator;
+const Sprite = @import("sprites.zig").Sprite;
 
 const SCREEN_HEIGHT = 720.0;
 const SCREEN_WIDTH = 1080.0;
@@ -30,9 +33,16 @@ pub fn main() !void {
     const size: rl.Vector2 = .{ .x = RENDER_WIDTH, .y = RENDER_HEIGHT };
     rl.SetShaderValue(lightingShader, sizeloc, &size, rl.SHADER_UNIFORM_VEC2);
 
+    const anim = try Animator.load("idle.aseprite");
+
+    var sprite: Sprite = .{ .animator = anim, .direction = .left, .position = rl.Vector2Zero() };
+
+    var left = true;
+
     const rayCount: i32 = 32;
     rl.SetShaderValue(lightingShader, rayCountLoc, &rayCount, rl.SHADER_UNIFORM_INT);
     while (!rl.WindowShouldClose()) {
+        const frametime_ms: u16 = @intFromFloat(rl.GetFrameTime() * 1000);
         rl.BeginTextureMode(occlusion_mask);
         rl.ClearBackground(rl.BLANK);
         rl.DrawRectangle(25, 30, 10, 100, rl.BLACK);
@@ -40,16 +50,21 @@ pub fn main() !void {
         rl.EndTextureMode();
 
         const mouse_position = util.GetRelativeMousePosition(RENDER_WIDTH, SCREEN_WIDTH, RENDER_HEIGHT, SCREEN_HEIGHT);
+        sprite.position = mouse_position;
         rl.BeginTextureMode(lighting);
         rl.ClearBackground(rl.BLANK);
         rl.DrawRectangle(100, 100, 20, 35, rl.RED);
         rl.DrawCircle(150, 200, 16, rl.BLUE);
-        rl.DrawCircleV(mouse_position, 16, rl.GREEN);
+        try sprite.draw();
         rl.EndTextureMode();
+
+        if (rl.IsKeyPressed(rl.KEY_R)) left = !left;
 
         rl.BeginTextureMode(scene);
         rl.DrawRectangle(140, 25, 20, 110, rl.WHITE);
         rl.EndTextureMode();
+
+        try sprite.animator.update(frametime_ms);
 
         rl.BeginTextureMode(render_texture);
         rl.BeginShaderMode(lightingShader);
