@@ -102,7 +102,6 @@ pub const Animator = struct {
             try textures.resize(aseprite.layers.len);
             const frame = aseprite.frames[i];
             for (frame.cels) |cel| {
-                std.log.debug("img {}", .{img_cel_to_raylib_texture(cel.data.compressed_image)});
                 textures.items[cel.layer] = switch (cel.data) {
                     .raw_image, .compressed_image => |img| .{ .texture = img_cel_to_raylib_texture(img), .x = cel.x, .y = cel.y },
                     else => undefined,
