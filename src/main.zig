@@ -22,6 +22,9 @@ pub fn main() !void {
     const player = ECS.new_entity();
     try ECS.add(player, .{ .transform = .{ .position = .{ .x = 200, .y = 150 } } });
     try ECS.add(player, .{ .render = .{ .animator = 0 } });
+    try ECS.add(player, .{ .tag = .{} });
+    try ECS.add(player, .{ .direction = .UP });
+    try ECS.add(player, .{ .physics = .{ .velocity = rl.Vector2Zero() } });
     defer rl.CloseWindow();
     rl.SetTargetFPS(60);
     const render_texture = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);

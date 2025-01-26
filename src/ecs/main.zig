@@ -79,5 +79,66 @@ pub const ECS = struct {
         self.render_system.tick_all(dt_ms, self.*);
         self.physics_system.tick_all(dt_ms, self.*);
         self.direction_system.tick_all(dt_ms, self.*);
+
+        // yolo but works, for now...
+        // also assuming we never tag anything else than player
+        // but at least it won't pollute the interface
+        // the game scope knows the player id anyway. So this is only for 'automagic' stuff
+        const player = self.tags.dense.getLast();
+
+        const physics = self.query(player, Components.PhysicsComponent).?;
+        const direction = self.query(player, Components.DirectionComponent).?;
+        const render = self.query(player, Components.RenderComponent).?;
+
+        var new_direction = direction.*;
+        const was_moving = rl.Vector2Length(physics.velocity) != 0.0;
+
+        const float_dt: f32 = @floatFromInt(dt_ms);
+        const SPEED: f32 = 4;
+        if (rl.IsKeyDown(rl.KEY_W)) {
+            physics.velocity.y = -SPEED * float_dt;
+            new_direction = .UP;
+        } else if (rl.IsKeyDown(rl.KEY_S)) {
+            physics.velocity.y = SPEED * float_dt;
+            new_direction = .DOWN;
+        } else {
+            physics.velocity.y = 0;
+        }
+        if (rl.IsKeyDown(rl.KEY_A)) {
+            physics.velocity.x = -SPEED * float_dt;
+            new_direction = .LEFT;
+        } else if (rl.IsKeyDown(rl.KEY_D)) {
+            physics.velocity.x = SPEED * float_dt;
+            new_direction = .RIGHT;
+        } else {
+            physics.velocity.x = 0;
+        }
+
+        if (new_direction != direction.*) {
+            direction.* = new_direction;
+        }
+
+        const magnitude = rl.Vector2Length(physics.velocity);
+        const is_moving = magnitude != 0.0;
+
+        if (magnitude > SPEED) {
+            physics.velocity = rl.Vector2Scale(rl.Vector2Normalize(physics.velocity), SPEED * float_dt);
+        }
+
+        switch (new_direction) {
+            .LEFT, .RIGHT => {
+                render.state = if (is_moving) .{ .WALK = .side } else .{ .IDLE = .side };
+            },
+            .UP => {
+                render.state = if (is_moving) .{ .WALK = .up } else .{ .IDLE = .up };
+            },
+            .DOWN => {
+                render.state = if (is_moving) .{ .WALK = .down } else .{ .IDLE = .down };
+            },
+        }
+
+        if (is_moving != was_moving) {
+            render.frame = 0;
+        }
     }
 };
