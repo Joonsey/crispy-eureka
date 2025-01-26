@@ -24,11 +24,13 @@ const Direction = enum {
 };
 
 const AnimationStateType = enum(u16) {
+    WALK,
     HURT,
     IDLE,
 };
 
 pub const AnimationState = union(AnimationStateType) {
+    WALK: Direction,
     HURT: Direction,
     IDLE: Direction,
 };
@@ -76,6 +78,7 @@ fn make_tag_map(aseprite: tatl.AsepriteImport) !std.AutoHashMap(AnimationState, 
                 try switch (key) {
                     .HURT => map.put(.{ .HURT = dir }, value),
                     .IDLE => map.put(.{ .IDLE = dir }, value),
+                    .WALK => map.put(.{ .WALK = dir }, value),
                 };
             }
         }
