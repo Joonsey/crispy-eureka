@@ -45,6 +45,7 @@ fn img_cel_to_raylib_texture(cel: tatl.ImageCel) rl.Texture {
         .mipmaps = 1,
         .format = rl.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
     };
+    // THIS WILL SEGFAULT IF CALLED BEFORE rl.InitWindow
     return rl.LoadTextureFromImage(img);
 }
 
