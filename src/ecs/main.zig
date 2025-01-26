@@ -94,7 +94,7 @@ pub const ECS = struct {
         const was_moving = rl.Vector2Length(physics.velocity) != 0.0;
 
         const float_dt: f32 = @floatFromInt(dt_ms);
-        const SPEED: f32 = 4;
+        const SPEED: f32 = 3;
         if (rl.IsKeyDown(rl.KEY_W)) {
             physics.velocity.y = -SPEED * float_dt;
             new_direction = .UP;
