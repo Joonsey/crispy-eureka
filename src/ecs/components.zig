@@ -20,14 +20,27 @@ pub const PhysicsComponent = struct {
     velocity: rl.Vector2,
 };
 
+pub const DirectionComponent = enum(u2) {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+};
+
+pub const TagComponent = struct {};
+
 pub const ComponentsType = enum {
     render,
     transform,
     physics,
+    tag,
+    direction,
 };
 
 pub const Component = union(ComponentsType) {
     render: RenderComponent,
     transform: TransformComponent,
     physics: PhysicsComponent,
+    tag: TagComponent,
+    direction: DirectionComponent,
 };
