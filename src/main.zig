@@ -6,7 +6,7 @@ const rl = @cImport({
 
 const particles = @import("particle.zig"); // assuming this is where particles will come from
 const util = @import("util.zig");
-const entities = @import("ecs.zig");
+const entities = @import("ecs/main.zig");
 const render = @import("render/main.zig");
 const System = render.System;
 
@@ -19,12 +19,12 @@ const RENDER_WIDTH = 360.0;
 var GPA = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = GPA.allocator();
 
-var ECS = entities.ECS.init(allocator);
-
 pub fn main() !void {
-    const player = ECS.new_entity();
-    _ = try ECS.set_components(.{ .Transform = .{ .position = .{ .x = 200, .y = 150 }, .rotation = 0 } }, player);
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "bossrush");
+    var ECS = entities.ECS.init(allocator);
+    const player = ECS.new_entity();
+    try ECS.add(player, .{ .transform = .{ .position = .{ .x = 200, .y = 150 } } });
+    try ECS.add(player, .{ .render = .{ .animator = 0 } });
     defer rl.CloseWindow();
     rl.SetTargetFPS(60);
     const render_texture = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
@@ -38,9 +38,6 @@ pub fn main() !void {
 
     const size: rl.Vector2 = .{ .x = RENDER_WIDTH, .y = RENDER_HEIGHT };
     rl.SetShaderValue(lightingShader, sizeloc, &size, rl.SHADER_UNIFORM_VEC2);
-
-    var system = System.init();
-    try system.register_entity(player, 0);
 
     const rayCount: i32 = 32;
     rl.SetShaderValue(lightingShader, rayCountLoc, &rayCount, rl.SHADER_UNIFORM_INT);
@@ -58,20 +55,10 @@ pub fn main() !void {
         rl.ClearBackground(rl.BLANK);
         rl.DrawRectangle(100, 100, 20, 35, rl.RED);
         rl.DrawCircle(150, 200, 16, rl.BLUE);
-        system.tick(frametime_ms, ECS);
+
+        ECS.tick(frametime_ms);
+
         rl.EndTextureMode();
-
-        //if (rl.IsKeyPressed(rl.KEY_R)) system.renders[player].?.state = .{ .HURT = .down };
-        var comps = ECS.query(player);
-        var transform = comps.Transform.?;
-        const SPEED = 10;
-
-        if (rl.IsKeyDown(rl.KEY_A)) transform.position.x -= SPEED;
-        if (rl.IsKeyDown(rl.KEY_D)) transform.position.x += SPEED;
-        if (rl.IsKeyDown(rl.KEY_W)) transform.position.y -= SPEED;
-        if (rl.IsKeyDown(rl.KEY_S)) transform.position.y += SPEED;
-        comps.Transform = transform;
-        _ = try ECS.set_components(comps, player);
 
         rl.BeginTextureMode(scene);
         rl.DrawRectangle(140, 25, 20, 110, rl.WHITE);
@@ -97,6 +84,7 @@ pub fn main() !void {
             .width = SCREEN_WIDTH,
             .height = SCREEN_HEIGHT,
         }, rl.Vector2Zero(), 0, rl.WHITE);
+        rl.DrawFPS(0, 0);
         rl.EndDrawing();
     }
 }

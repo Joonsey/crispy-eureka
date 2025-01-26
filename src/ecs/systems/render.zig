@@ -4,27 +4,26 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
-const Animator = @import("animator.zig").Animator;
-const AnimationState = @import("animator.zig").AnimationState;
-const tatl = @import("tatl.zig");
-const ecs = @import("../ecs.zig");
-
-const ENTITY_COUNT = 100000;
+const render = @import("../../render/main.zig");
+const Animator = render.Animator;
+const AnimationState = render.AnimationState;
+const Components = @import("../components.zig");
+const ecs = @import("../main.zig");
 
 fn draw(position: rl.Vector2, texture: rl.Texture) void {
     rl.DrawTextureV(texture, position, rl.WHITE);
 }
 
-pub const System = struct {
+pub const RenderSystem = struct {
     entities: std.ArrayList(ecs.EntityId),
     animators: []Animator,
 
-    pub fn init() System {
+    pub fn init() RenderSystem {
         var animators = std.ArrayList(Animator).init(page_allocator);
 
         for ([_][]const u8{"idle.aseprite"}) |path| {
             const file = cwd.openFile(path, .{}) catch std.debug.panic("erronous path: {s}", .{path});
-            const aseprite = tatl.import(page_allocator, file.reader()) catch std.debug.panic("error parsing aseprite file: {s}", .{path});
+            const aseprite = render.import(page_allocator, file.reader()) catch std.debug.panic("error parsing aseprite file: {s}", .{path});
             const anim = Animator.load(aseprite) catch std.debug.panic("error building animator : {s}", .{path});
             animators.append(anim) catch unreachable;
         }
@@ -42,8 +41,8 @@ pub const System = struct {
     }
 
     fn tick(self: *@This(), frametime_ms: u16, ECS: ecs.ECS, entity: ecs.EntityId) void {
-        const animation = ECS.query(entity, ecs.RenderComponent) orelse return;
-        const transform = ECS.query(entity, ecs.TransformComponent) orelse return;
+        const animation = ECS.query(entity, Components.RenderComponent) orelse return;
+        const transform = ECS.query(entity, Components.TransformComponent) orelse return;
 
         const animator = self.animators[animation.animator];
         const frames = animator.get_frames(animation.state);
