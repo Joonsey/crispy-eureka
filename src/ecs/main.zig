@@ -125,17 +125,12 @@ pub const ECS = struct {
             physics.velocity = rl.Vector2Scale(rl.Vector2Normalize(physics.velocity), SPEED * float_dt);
         }
 
-        switch (new_direction) {
-            .LEFT, .RIGHT => {
-                render.state = if (is_moving) .{ .WALK = .side } else .{ .IDLE = .side };
-            },
-            .UP => {
-                render.state = if (is_moving) .{ .WALK = .up } else .{ .IDLE = .up };
-            },
-            .DOWN => {
-                render.state = if (is_moving) .{ .WALK = .down } else .{ .IDLE = .down };
-            },
-        }
+        render.state = switch (new_direction) {
+            .RIGHT => if (is_moving) .{ .WALK = .right } else .{ .IDLE = .right },
+            .LEFT => if (is_moving) .{ .WALK = .left } else .{ .IDLE = .left },
+            .UP => if (is_moving) .{ .WALK = .up } else .{ .IDLE = .up },
+            .DOWN => if (is_moving) .{ .WALK = .down } else .{ .IDLE = .down },
+        };
 
         if (is_moving != was_moving) {
             render.frame = 0;

@@ -11,7 +11,7 @@ pub const TransformComponent = struct {
 
 pub const RenderComponent = struct {
     animator: usize,
-    state: AnimationState = .{ .HURT = .side },
+    state: AnimationState = .{ .HURT = .left },
     frame: usize = 0,
     frame_time: u16 = 0,
 };

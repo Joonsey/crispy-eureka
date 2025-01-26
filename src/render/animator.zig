@@ -18,7 +18,8 @@ const AnimationFrame = struct {
 const TextureMap = std.StringHashMap(usize);
 
 const Direction = enum {
-    side,
+    right,
+    left,
     down,
     up,
 };
