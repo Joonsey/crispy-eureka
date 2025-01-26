@@ -35,31 +35,12 @@ pub const AnimationState = union(AnimationStateType) {
     IDLE: Direction,
 };
 
-const page_allocator = std.heap.page_allocator;
-
-fn img_cel_to_raylib_texture(cel: tatl.ImageCel) rl.Texture {
-    const img = rl.Image{
-        .data = @ptrCast(cel.pixels.ptr),
-        .width = @intCast(cel.width),
-        .height = @intCast(cel.height),
-        .mipmaps = 1,
-        .format = rl.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
-    };
-    // THIS WILL SEGFAULT IF CALLED BEFORE rl.InitWindow
-    return rl.LoadTextureFromImage(img);
-}
-
-const Value = struct {
+const FrameSlice = struct {
     from: usize,
     to: usize,
 };
 
-fn make_tag_map(aseprite: tatl.AsepriteImport) !std.AutoHashMap(AnimationState, Value) {
-    var map = std.AutoHashMap(
-        AnimationState,
-        Value,
-    ).init(page_allocator);
-
+fn make_tag_map(aseprite: tatl.AsepriteImport, map: *std.AutoHashMap(AnimationState, FrameSlice)) !void {
     var big_tag: ?tatl.Tag = null;
     var big_key: ?AnimationStateType = null;
     for (0..aseprite.tags.len) |i| {
@@ -75,7 +56,7 @@ fn make_tag_map(aseprite: tatl.AsepriteImport) !std.AutoHashMap(AnimationState, 
         if (big_tag == null) continue;
         if (std.meta.stringToEnum(Direction, tag.name)) |dir| {
             if (big_key) |key| {
-                const value: Value = .{ .from = tag.from, .to = tag.to };
+                const value: FrameSlice = .{ .from = tag.from, .to = tag.to };
                 try switch (key) {
                     .HURT => map.put(.{ .HURT = dir }, value),
                     .IDLE => map.put(.{ .IDLE = dir }, value),
@@ -84,19 +65,30 @@ fn make_tag_map(aseprite: tatl.AsepriteImport) !std.AutoHashMap(AnimationState, 
             }
         }
     }
-    return map;
+}
+
+fn img_cel_to_raylib_texture(cel: tatl.ImageCel) rl.Texture {
+    const img = rl.Image{
+        .data = @ptrCast(cel.pixels.ptr),
+        .width = @intCast(cel.width),
+        .height = @intCast(cel.height),
+        .mipmaps = 1,
+        .format = rl.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+    };
+    // THIS WILL SEGFAULT IF CALLED BEFORE rl.InitWindow
+    return rl.LoadTextureFromImage(img);
 }
 
 pub const Animator = struct {
     texture_map: TextureMap,
     animation_frames: []AnimationFrame,
-    tag_map: std.AutoHashMap(AnimationState, Value),
+    tag_map: std.AutoHashMap(AnimationState, FrameSlice),
     canvas_size: rl.Vector2,
 
-    pub fn load(aseprite: tatl.AsepriteImport) !Animator {
-        var texture_map = TextureMap.init(page_allocator);
-        var textures = try std.ArrayList(AnimationTexture).initCapacity(page_allocator, aseprite.layers.len);
-        var animation_frames = try std.ArrayList(AnimationFrame).initCapacity(page_allocator, aseprite.frames.len);
+    pub fn load(aseprite: tatl.AsepriteImport, allocator: std.mem.Allocator) !Animator {
+        var texture_map = TextureMap.init(allocator);
+        var textures = try std.ArrayList(AnimationTexture).initCapacity(allocator, aseprite.layers.len);
+        var animation_frames = try std.ArrayList(AnimationFrame).initCapacity(allocator, aseprite.frames.len);
         try animation_frames.resize(aseprite.frames.len);
 
         for (0..aseprite.frames.len) |i| {
@@ -116,9 +108,11 @@ pub const Animator = struct {
             try texture_map.put(layer.name, i);
         }
 
+        var map = std.AutoHashMap(AnimationState, FrameSlice).init(allocator);
+        try make_tag_map(aseprite, &map);
         return .{
             .texture_map = texture_map,
-            .tag_map = try make_tag_map(aseprite),
+            .tag_map = map,
             .animation_frames = try animation_frames.toOwnedSlice(),
             .canvas_size = .{
                 .x = @floatFromInt(aseprite.width),

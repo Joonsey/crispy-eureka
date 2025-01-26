@@ -18,19 +18,20 @@ pub const RenderSystem = struct {
     entities: std.ArrayList(ecs.EntityId),
     animators: []Animator,
 
-    pub fn init() RenderSystem {
-        var animators = std.ArrayList(Animator).init(page_allocator);
+    pub fn init(allocator: std.mem.Allocator) RenderSystem {
+        var animators = std.ArrayList(Animator).init(allocator);
+        const cwd = std.fs.cwd();
 
         for ([_][]const u8{"idle.aseprite"}) |path| {
             const file = cwd.openFile(path, .{}) catch std.debug.panic("erronous path: {s}", .{path});
-            const aseprite = render.import(page_allocator, file.reader()) catch std.debug.panic("error parsing aseprite file: {s}", .{path});
-            const anim = Animator.load(aseprite) catch std.debug.panic("error building animator : {s}", .{path});
+            const aseprite = render.import(allocator, file.reader()) catch std.debug.panic("error parsing aseprite file: {s}", .{path});
+            const anim = Animator.load(aseprite, allocator) catch std.debug.panic("error building animator : {s}", .{path});
             animators.append(anim) catch unreachable;
         }
 
         return .{
             .animators = animators.toOwnedSlice() catch unreachable,
-            .entities = std.ArrayList(ecs.EntityId).init(page_allocator),
+            .entities = std.ArrayList(ecs.EntityId).init(allocator),
         };
     }
 
@@ -65,6 +66,3 @@ pub const RenderSystem = struct {
         }, texture.texture);
     }
 };
-
-const cwd = std.fs.cwd();
-const page_allocator = std.heap.page_allocator;

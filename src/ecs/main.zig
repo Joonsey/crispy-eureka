@@ -25,7 +25,7 @@ pub const ECS = struct {
             .physics = SparseSet(Components.PhysicsComponent).init(allocator),
             .renders = SparseSet(Components.RenderComponent).init(allocator),
             .next_entity_id = 0,
-            .render_system = Systems.RenderSystem.init(),
+            .render_system = Systems.RenderSystem.init(allocator),
             .physics_system = Systems.PhysicsSystem.init(allocator),
         };
     }

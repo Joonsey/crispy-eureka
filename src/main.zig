@@ -4,11 +4,8 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
-const particles = @import("particle.zig"); // assuming this is where particles will come from
 const util = @import("util.zig");
 const entities = @import("ecs/main.zig");
-const render = @import("render/main.zig");
-const System = render.System;
 
 const SCREEN_HEIGHT = 720.0;
 const SCREEN_WIDTH = 1080.0;
