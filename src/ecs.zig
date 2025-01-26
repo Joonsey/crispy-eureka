@@ -3,35 +3,19 @@ const rl = @cImport({
     @cInclude("raylib.h");
     @cInclude("raymath.h");
 });
-const UP = @import("util.zig").UP;
 
 const MAX_ENTITY_COUNT = 10000;
 pub const EntityId = u32;
 
 const TransformComponent = struct {
-    position: rl.Vector3,
+    position: rl.Vector2,
     rotation: f32,
-    rotation_axis: rl.Vector3 = UP,
-};
-
-const RenderComponent = struct {
-    shader: ?*rl.Shader = null,
-    tint: rl.Color = rl.WHITE,
-    scale: rl.Vector3 = rl.Vector3One(),
-    model: rl.Model,
-};
-
-const PathComponent = struct {
-    target: rl.Vector3,
-    path: []rl.Vector3,
-    current_index: usize = 0,
 };
 
 const Components = struct {
     Transform: ?TransformComponent = null,
     Velocity: ?rl.Vector3 = null,
     Health: ?f32 = null,
-    Render: ?RenderComponent = null,
 };
 
 fn contains(list: std.ArrayList(EntityId), value: EntityId) bool {
@@ -122,29 +106,7 @@ pub const ECS = struct {
         return View.init(self.entities[0..self.count]);
     }
 
-    pub fn render(self: *ECS) void {
-        var _view = self.view();
-        while (_view.next()) |comps| {
-            if (comps.Render) |_render| {
-                if (comps.Transform) |transform| {
-                    if (_render.shader) |shader| {
-                        rl.BeginShaderMode(shader.*);
-                    }
-
-                    rl.DrawModelEx(
-                        _render.model,
-                        transform.position,
-                        transform.rotation_axis,
-                        transform.rotation,
-                        _render.scale,
-                        _render.tint,
-                    );
-
-                    if (_render.shader) |_| {
-                        rl.EndShaderMode();
-                    }
-                }
-            }
-        }
+    pub fn query(self: @This(), id: EntityId) Components {
+        return self.entities[id];
     }
 };

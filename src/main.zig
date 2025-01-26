@@ -19,7 +19,11 @@ const RENDER_WIDTH = 360.0;
 var GPA = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = GPA.allocator();
 
+var ECS = entities.ECS.init(allocator);
+
 pub fn main() !void {
+    const player = ECS.new_entity();
+    _ = try ECS.set_components(.{ .Transform = .{ .position = .{ .x = 200, .y = 150 }, .rotation = 0 } }, player);
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "bossrush");
     defer rl.CloseWindow();
     rl.SetTargetFPS(60);
@@ -36,9 +40,7 @@ pub fn main() !void {
     rl.SetShaderValue(lightingShader, sizeloc, &size, rl.SHADER_UNIFORM_VEC2);
 
     var system = System.init();
-    system.register_entity(1, 0);
-
-    var left = true;
+    try system.register_entity(player, 0);
 
     const rayCount: i32 = 32;
     rl.SetShaderValue(lightingShader, rayCountLoc, &rayCount, rl.SHADER_UNIFORM_INT);
@@ -56,10 +58,20 @@ pub fn main() !void {
         rl.ClearBackground(rl.BLANK);
         rl.DrawRectangle(100, 100, 20, 35, rl.RED);
         rl.DrawCircle(150, 200, 16, rl.BLUE);
-        system.tick(frametime_ms);
+        system.tick(frametime_ms, ECS);
         rl.EndTextureMode();
 
-        if (rl.IsKeyPressed(rl.KEY_R)) left = !left;
+        //if (rl.IsKeyPressed(rl.KEY_R)) system.renders[player].?.state = .{ .HURT = .down };
+        var comps = ECS.query(player);
+        var transform = comps.Transform.?;
+        const SPEED = 10;
+
+        if (rl.IsKeyDown(rl.KEY_A)) transform.position.x -= SPEED;
+        if (rl.IsKeyDown(rl.KEY_D)) transform.position.x += SPEED;
+        if (rl.IsKeyDown(rl.KEY_W)) transform.position.y -= SPEED;
+        if (rl.IsKeyDown(rl.KEY_S)) transform.position.y += SPEED;
+        comps.Transform = transform;
+        _ = try ECS.set_components(comps, player);
 
         rl.BeginTextureMode(scene);
         rl.DrawRectangle(140, 25, 20, 110, rl.WHITE);
