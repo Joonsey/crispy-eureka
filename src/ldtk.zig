@@ -24,7 +24,7 @@ const Rules = struct {
 
 const Tile = struct {
     px: [2]i32,
-    src: [2]i32,
+    src: [2]f32,
     f: u2,
     d: []i32,
     t: u32,
