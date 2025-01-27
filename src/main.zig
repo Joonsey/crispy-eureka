@@ -4,6 +4,7 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
+const ldtk = @import("ldtk.zig");
 const util = @import("util.zig");
 const entities = @import("ecs/main.zig");
 
@@ -18,66 +19,89 @@ const allocator = GPA.allocator();
 
 pub fn main() !void {
     rl.InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "bossrush");
+    defer rl.CloseWindow();
+
     var ECS = entities.ECS.init(allocator);
+    const conf = try ldtk.Ldtk.init();
+
     const player = ECS.new_entity();
     try ECS.add(player, .{ .transform = .{ .position = .{ .x = 200, .y = 150 } } });
     try ECS.add(player, .{ .render = .{ .animator = 0 } });
     try ECS.add(player, .{ .tag = .{} });
     try ECS.add(player, .{ .direction = .UP });
     try ECS.add(player, .{ .physics = .{ .velocity = rl.Vector2Zero() } });
-    defer rl.CloseWindow();
+    try ECS.add(player, .{ .z = .{ .z = 1 } });
+    try ECS.add(player, .{ .box_collider = .{ .dimensions = .{ .x = 6, .y = 6 }, .offset = .{ .x = -4, .y = -4 } } });
     rl.SetTargetFPS(60);
-    const render_texture = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
-    const occlusion_mask = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
+    for (conf.levels) |level| {
+        var i = level.layerInstances.len - 1;
+        while (i > 0) : (i -= 1) {
+            const instance = level.layerInstances[i];
+            const collision_layer = std.mem.eql(u8, instance.__identifier, "Collisions");
+            const z_layer_one = collision_layer or std.mem.eql(u8, instance.__identifier, "Wall_tops");
+            for (instance.gridTiles) |tile| {
+                const tile_id = ECS.new_entity();
+                try ECS.add(tile_id, .{ .transform = .{
+                    .position = .{
+                        .x = @floatFromInt(tile.px[0] + instance.__pxTotalOffsetX + level.worldX),
+                        .y = @floatFromInt(tile.px[1] + instance.__pxTotalOffsetY + level.worldY),
+                    },
+                } });
+                try ECS.add(tile_id, .{
+                    .sprite = .{
+                        .source = .{ .x = tile.src[0], .y = tile.src[1] },
+                        .tilesheet = 0,
+                        .flipX = (tile.f == 1 or tile.f == 3),
+                        .flipY = (tile.f == 2 or tile.f == 3),
+                        .width = 16,
+                        .height = 16,
+                        .alpha = @intFromFloat(tile.a * 255),
+                    },
+                });
+                if (z_layer_one) try ECS.add(tile_id, .{ .z = .{ .z = 1 } });
+            }
+            for (instance.autoLayerTiles) |tile| {
+                const tile_id = ECS.new_entity();
+                try ECS.add(tile_id, .{ .transform = .{
+                    .position = .{
+                        .x = @floatFromInt(tile.px[0] + instance.__pxTotalOffsetX + level.worldX),
+                        .y = @floatFromInt(tile.px[1] + instance.__pxTotalOffsetY + level.worldY),
+                    },
+                } });
+                try ECS.add(tile_id, .{
+                    .sprite = .{
+                        .source = .{ .x = tile.src[0], .y = tile.src[1] },
+                        .tilesheet = 0,
+                        .flipX = (tile.f == 1 or tile.f == 3),
+                        .flipY = (tile.f == 2 or tile.f == 3),
+                        .width = 16,
+                        .height = 16,
+                        .alpha = @intFromFloat(tile.a * 255),
+                    },
+                });
+                if (z_layer_one) try ECS.add(tile_id, .{ .z = .{ .z = 1 } });
+                if (collision_layer) try ECS.add(tile_id, .{ .box_collider = .{ .dimensions = .{ .x = 16, .y = 16 }, .offset = .{ .x = -8, .y = -16 } } });
+            }
+        }
+    }
+
     const scene = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
-    const lighting = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
-    const lightingShader = rl.LoadShader(null, "./lighting.glsl");
 
-    const rayCountLoc = rl.GetShaderLocation(lightingShader, "rayCount");
-    const sizeloc = rl.GetShaderLocation(lightingShader, "size");
-
-    const size: rl.Vector2 = .{ .x = RENDER_WIDTH, .y = RENDER_HEIGHT };
-    rl.SetShaderValue(lightingShader, sizeloc, &size, rl.SHADER_UNIFORM_VEC2);
-
-    const rayCount: i32 = 32;
-    rl.SetShaderValue(lightingShader, rayCountLoc, &rayCount, rl.SHADER_UNIFORM_INT);
     while (!rl.WindowShouldClose()) {
         const frametime_ms: u16 = @intFromFloat(rl.GetFrameTime() * 1000);
-        rl.BeginTextureMode(occlusion_mask);
-        rl.ClearBackground(rl.BLANK);
-        rl.DrawRectangle(25, 30, 10, 100, rl.BLACK);
-        rl.DrawRectangle(45, 30, 10, 100, rl.BLACK);
-        rl.EndTextureMode();
-
-        const mouse_position = util.GetRelativeMousePosition(RENDER_WIDTH, SCREEN_WIDTH, RENDER_HEIGHT, SCREEN_HEIGHT);
-        _ = mouse_position; // autofix
-        rl.BeginTextureMode(lighting);
-        rl.ClearBackground(rl.BLANK);
-        rl.DrawRectangle(100, 100, 20, 35, rl.RED);
-        rl.DrawCircle(150, 200, 16, rl.BLUE);
+        //const mouse_position = util.GetRelativeMousePosition(RENDER_WIDTH, SCREEN_WIDTH, RENDER_HEIGHT, SCREEN_HEIGHT);
+        rl.BeginTextureMode(scene);
+        rl.ClearBackground(rl.BLACK);
 
         ECS.tick(frametime_ms);
-
-        rl.EndTextureMode();
-
-        rl.BeginTextureMode(scene);
-        rl.DrawRectangle(140, 25, 20, 110, rl.WHITE);
-        rl.EndTextureMode();
-
-        rl.BeginTextureMode(render_texture);
-        rl.BeginShaderMode(lightingShader);
-        rl.SetShaderValueTexture(lightingShader, rl.GetShaderLocation(lightingShader, "lighting"), lighting.texture);
-        rl.SetShaderValueTexture(lightingShader, rl.GetShaderLocation(lightingShader, "occlusion"), occlusion_mask.texture);
-        rl.DrawTexture(scene.texture, 0, 0, rl.WHITE);
-        rl.EndShaderMode();
         rl.EndTextureMode();
 
         rl.BeginDrawing();
-        rl.DrawTexturePro(render_texture.texture, .{
+        rl.DrawTexturePro(scene.texture, .{
             .x = 0,
             .y = 0,
             .width = RENDER_WIDTH,
-            .height = RENDER_HEIGHT,
+            .height = -RENDER_HEIGHT,
         }, .{
             .x = 0,
             .y = 0,
