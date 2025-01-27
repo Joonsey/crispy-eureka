@@ -17,9 +17,11 @@ fn draw(position: rl.Vector2, texture: rl.Texture) void {
 pub const RenderSystem = struct {
     entities: std.ArrayList(ecs.EntityId),
     animators: []Animator,
+    tilesheets: []rl.Texture,
 
     pub fn init(allocator: std.mem.Allocator) RenderSystem {
         var animators = std.ArrayList(Animator).init(allocator);
+        var tilesheets = std.ArrayList(rl.Texture).init(allocator);
         const cwd = std.fs.cwd();
 
         for ([_][]const u8{"idle.aseprite"}) |path| {
@@ -29,21 +31,55 @@ pub const RenderSystem = struct {
             animators.append(anim) catch unreachable;
         }
 
+        for ([_][]const u8{"example.png"}) |path| {
+            tilesheets.append(rl.LoadTexture(@ptrCast(path))) catch unreachable;
+        }
+
         return .{
             .animators = animators.toOwnedSlice() catch unreachable,
             .entities = std.ArrayList(ecs.EntityId).init(allocator),
+            .tilesheets = tilesheets.toOwnedSlice() catch unreachable,
         };
     }
 
     pub fn tick_all(self: *@This(), frametime_ms: u16, ECS: ecs.ECS) void {
-        for (self.entities.items) |entity| {
+        const entities = self.entities.items;
+        std.mem.sort(ecs.EntityId, entities, ECS, sort_by_y);
+        for (entities) |entity| {
             self.tick(frametime_ms, ECS, entity);
         }
     }
 
+    fn sort_by_y(ECS: ecs.ECS, a: ecs.EntityId, b: ecs.EntityId) bool {
+        const transform_a = ECS.query(a, Components.TransformComponent) orelse &Components.TransformComponent{ .position = rl.Vector2Zero() };
+        const transform_b = ECS.query(b, Components.TransformComponent) orelse &Components.TransformComponent{ .position = rl.Vector2Zero() };
+
+        const a_z = ECS.query(a, Components.ZComponent) orelse &Components.ZComponent{ .z = 0 };
+        const b_z = ECS.query(b, Components.ZComponent) orelse &Components.ZComponent{ .z = 0 };
+        if (a_z.z != b_z.z) {
+            return a_z.z < b_z.z;
+        }
+
+        return transform_a.position.y < transform_b.position.y;
+    }
+
     fn tick(self: *@This(), frametime_ms: u16, ECS: ecs.ECS, entity: ecs.EntityId) void {
-        const animation = ECS.query(entity, Components.RenderComponent) orelse return;
         const transform = ECS.query(entity, Components.TransformComponent) orelse return;
+        if (ECS.query(entity, Components.SpriteComponent)) |comp| {
+            var color = rl.WHITE;
+            color.a = comp.alpha;
+
+            rl.DrawTexturePro(
+                self.tilesheets[comp.tilesheet],
+                .{ .x = comp.source.x, .y = comp.source.y, .width = if (comp.flipX) -comp.width else comp.width, .height = if (comp.flipY) -comp.height else comp.height },
+                .{ .x = transform.position.x, .y = transform.position.y, .width = comp.width, .height = comp.height },
+                .{ .x = comp.width / 2, .y = comp.height / 2 },
+                0,
+                color,
+            );
+            return;
+        }
+        const animation = ECS.query(entity, Components.RenderComponent) orelse return;
 
         const animator = self.animators[animation.animator];
         const frames = animator.get_frames(animation.state);

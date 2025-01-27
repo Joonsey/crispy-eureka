@@ -16,8 +16,28 @@ pub const RenderComponent = struct {
     frame_time: u16 = 0,
 };
 
+pub const ZComponent = struct {
+    z: i16,
+};
+
+pub const SpriteComponent = struct {
+    tilesheet: usize,
+    width: f32,
+    height: f32,
+    flipX: bool = false,
+    flipY: bool = false,
+    rotation: f32 = 0,
+    alpha: u8 = 255,
+    source: rl.Vector2 = rl.Vector2Zero(),
+};
+
 pub const PhysicsComponent = struct {
     velocity: rl.Vector2,
+};
+
+pub const BoxColliderComponent = struct {
+    offset: rl.Vector2,
+    dimensions: rl.Vector2,
 };
 
 pub const DirectionComponent = enum(u2) {
@@ -35,6 +55,9 @@ pub const ComponentsType = enum {
     physics,
     tag,
     direction,
+    sprite,
+    z,
+    box_collider,
 };
 
 pub const Component = union(ComponentsType) {
@@ -43,4 +66,7 @@ pub const Component = union(ComponentsType) {
     physics: PhysicsComponent,
     tag: TagComponent,
     direction: DirectionComponent,
+    sprite: SpriteComponent,
+    z: ZComponent,
+    box_collider: BoxColliderComponent,
 };

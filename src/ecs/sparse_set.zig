@@ -45,6 +45,7 @@ pub fn SparseSet(comptime T: type) type {
                 return null;
             }
             const dense_index = self.sparse.items[entity_id].?;
+            if (dense_index >= self.components.items.len) return null;
             return &self.components.items[dense_index];
         }
 

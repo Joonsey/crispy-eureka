@@ -16,11 +16,15 @@ pub const ECS = struct {
     physics: SparseSet(Components.PhysicsComponent),
     tags: SparseSet(Components.TagComponent),
     directions: SparseSet(Components.DirectionComponent),
+    sprites: SparseSet(Components.SpriteComponent),
+    z: SparseSet(Components.ZComponent),
+    box_colliders: SparseSet(Components.BoxColliderComponent),
     next_entity_id: EntityId,
 
     render_system: Systems.RenderSystem,
     physics_system: Systems.PhysicsSystem,
     direction_system: Systems.DirectionSystem,
+    collision_system: Systems.CollisionSystem,
 
     pub fn init(allocator: std.mem.Allocator) ECS {
         return .{
@@ -29,10 +33,14 @@ pub const ECS = struct {
             .renders = SparseSet(Components.RenderComponent).init(allocator),
             .tags = SparseSet(Components.TagComponent).init(allocator),
             .directions = SparseSet(Components.DirectionComponent).init(allocator),
+            .sprites = SparseSet(Components.SpriteComponent).init(allocator),
+            .z = SparseSet(Components.ZComponent).init(allocator),
+            .box_colliders = SparseSet(Components.BoxColliderComponent).init(allocator),
             .next_entity_id = 0,
             .render_system = Systems.RenderSystem.init(allocator),
             .physics_system = Systems.PhysicsSystem.init(allocator),
             .direction_system = Systems.DirectionSystem.init(allocator),
+            .collision_system = Systems.CollisionSystem.init(allocator),
         };
     }
 
@@ -49,6 +57,9 @@ pub const ECS = struct {
             Components.TransformComponent => self.transforms.get(id),
             Components.TagComponent => self.tags.get(id),
             Components.DirectionComponent => self.directions.get(id),
+            Components.SpriteComponent => self.sprites.get(id),
+            Components.ZComponent => self.z.get(id),
+            Components.BoxColliderComponent => self.box_colliders.get(id),
             else => null,
         };
     }
@@ -71,6 +82,17 @@ pub const ECS = struct {
                 try self.directions.set(id, comp);
                 // we need to tell the direction system that we might care about this guy now
                 try self.direction_system.entities.append(id);
+            },
+            .sprite => |comp| {
+                try self.sprites.set(id, comp);
+                // we need to tell the render system that we might care about this guy now
+                try self.render_system.entities.append(id);
+            },
+            .z => |comp| try self.z.set(id, comp),
+            .box_collider => |comp| {
+                // we need to tell the collision system that we might care about this guy now
+                try self.box_colliders.set(id, comp);
+                try self.collision_system.entities.append(id);
             },
         }
     }
