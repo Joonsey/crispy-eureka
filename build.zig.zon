@@ -27,6 +27,10 @@
             // Path to the raylib submodule inside of this repo
             .path = "raylib",
         },
+		.network = .{
+            .url = "https://github.com/MasterQ32/zig-network/archive/8db1aa2.tar.gz",
+			.hash = "12203ae90636504172540e6e0feb2881affd82768af6f0a379cb84a3f70b53705fe5",
+        },
     },
     .paths = .{
         "build.zig",

@@ -16,10 +16,12 @@ pub fn build(b: *std.Build) void {
     const raylib = b.dependency("raylib", .{
         .target = target,
         .optimize = optimize,
-        .shared = true,
+        .shared = (target.result.os.tag != .windows),
     });
 
     const libraylib = raylib.artifact("raylib");
+
+    exe.root_module.addImport("network", b.dependency("network", .{}).module("network"));
     exe.linkLibrary(libraylib);
 
     const run_cmd = b.addRunArtifact(exe);
