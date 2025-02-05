@@ -7,6 +7,7 @@ const rl = @cImport({
 const ldtk = @import("ldtk.zig");
 const util = @import("util.zig");
 const entities = @import("ecs/main.zig");
+const network = @import("network");
 
 const SCREEN_HEIGHT = 720.0;
 const SCREEN_WIDTH = 1080.0;
@@ -22,7 +23,15 @@ pub fn main() !void {
     defer rl.CloseWindow();
 
     var ECS = entities.ECS.init(allocator);
-    const conf = try ldtk.Ldtk.init();
+    try network.init();
+    var sock = try network.Socket.create(.ipv4, .udp);
+    defer sock.close();
+    try sock.bindToPort(6666);
+
+    var buffer: [1024]u8 = undefined;
+    const from = try sock.receiveFrom(&buffer);
+    _ = try sock.sendTo(from.sender, buffer[0..from.numberOfBytes]);
+    std.log.info("{}, {s}", .{ from.sender.address, buffer[0..from.numberOfBytes] });
 
     const player = ECS.new_entity();
     try ECS.add(player, .{ .transform = .{ .position = .{ .x = 200, .y = 150 } } });
@@ -33,63 +42,10 @@ pub fn main() !void {
     try ECS.add(player, .{ .z = .{ .z = 1 } });
     try ECS.add(player, .{ .box_collider = .{ .dimensions = .{ .x = 6, .y = 6 }, .offset = .{ .x = -4, .y = -4 } } });
     rl.SetTargetFPS(60);
-    for (conf.levels) |level| {
-        var i = level.layerInstances.len - 1;
-        while (i > 0) : (i -= 1) {
-            const instance = level.layerInstances[i];
-            const collision_layer = std.mem.eql(u8, instance.__identifier, "Collisions");
-            const z_layer_one = collision_layer or std.mem.eql(u8, instance.__identifier, "Wall_tops");
-            for (instance.gridTiles) |tile| {
-                const tile_id = ECS.new_entity();
-                try ECS.add(tile_id, .{ .transform = .{
-                    .position = .{
-                        .x = @floatFromInt(tile.px[0] + instance.__pxTotalOffsetX + level.worldX),
-                        .y = @floatFromInt(tile.px[1] + instance.__pxTotalOffsetY + level.worldY),
-                    },
-                } });
-                try ECS.add(tile_id, .{
-                    .sprite = .{
-                        .source = .{ .x = tile.src[0], .y = tile.src[1] },
-                        .tilesheet = 0,
-                        .flipX = (tile.f == 1 or tile.f == 3),
-                        .flipY = (tile.f == 2 or tile.f == 3),
-                        .width = 16,
-                        .height = 16,
-                        .alpha = @intFromFloat(tile.a * 255),
-                    },
-                });
-                if (z_layer_one) try ECS.add(tile_id, .{ .z = .{ .z = 1 } });
-            }
-            for (instance.autoLayerTiles) |tile| {
-                const tile_id = ECS.new_entity();
-                try ECS.add(tile_id, .{ .transform = .{
-                    .position = .{
-                        .x = @floatFromInt(tile.px[0] + instance.__pxTotalOffsetX + level.worldX),
-                        .y = @floatFromInt(tile.px[1] + instance.__pxTotalOffsetY + level.worldY),
-                    },
-                } });
-                try ECS.add(tile_id, .{
-                    .sprite = .{
-                        .source = .{ .x = tile.src[0], .y = tile.src[1] },
-                        .tilesheet = 0,
-                        .flipX = (tile.f == 1 or tile.f == 3),
-                        .flipY = (tile.f == 2 or tile.f == 3),
-                        .width = 16,
-                        .height = 16,
-                        .alpha = @intFromFloat(tile.a * 255),
-                    },
-                });
-                if (z_layer_one) try ECS.add(tile_id, .{ .z = .{ .z = 1 } });
-                if (collision_layer) try ECS.add(tile_id, .{ .box_collider = .{ .dimensions = .{ .x = 16, .y = 16 }, .offset = .{ .x = -8, .y = -16 } } });
-            }
-        }
-    }
-
     const scene = rl.LoadRenderTexture(RENDER_WIDTH, RENDER_HEIGHT);
 
     while (!rl.WindowShouldClose()) {
         const frametime_ms: u16 = @intFromFloat(rl.GetFrameTime() * 1000);
-        //const mouse_position = util.GetRelativeMousePosition(RENDER_WIDTH, SCREEN_WIDTH, RENDER_HEIGHT, SCREEN_HEIGHT);
         rl.BeginTextureMode(scene);
         rl.ClearBackground(rl.BLACK);
 
